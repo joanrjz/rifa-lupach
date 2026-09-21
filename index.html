@@ -125,49 +125,26 @@
     <div class="cuadrante" id="cuadrilla"></div>
 
     <script>
-        const BIN_ID = "6aac3643ac6210605ad99cf0"; 
-        const API_KEY = "$2a$10$ncqSA1ZWYrT.9e2El5XOxuj4OjVN5pedxNmXbhioI4nFixVfyXsoa"; 
-
         const CONTRASEÑA_CORRECTA = "Grecia2026";
         const TOTAL_NUMEROS = 150;
-        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+        // Apunta directamente al archivo JSON dentro de tu repositorio en GitHub Pages
+        const DB_URL = "rifa-db.json"; 
         
         let estadoRifa = {};
 
         async function cargarEstado() {
             try {
-                const res = await fetch(`${API_URL}/latest`, {
-                    headers: { 
-                        "X-Master-Key": API_KEY,
-                        "X-Bin-Meta": "false" 
-                    }
-                });
+                // Añadimos un parámetro de tiempo para evitar que el navegador guarde en caché versiones viejas
+                const res = await fetch(`${DB_URL}?t=${new Date().getTime()}`);
+                if (!res.ok) throw new Error("No se pudo cargar la base de datos");
                 
-                if (!res.ok) throw new Error("Respuesta inválida del servidor");
-                const data = await res.json();
-                
-                if (Object.keys(data).length <= 1 || typeof Object.values(data)[0] === 'boolean') {
-                    await inicializarBaseDatos();
-                } else {
-                    estadoRifa = data;
-                    document.getElementById('loading').style.display = 'none';
-                    renderizarCuadrilla();
-                }
+                estadoRifa = await res.json();
+                document.getElementById('loading').style.display = 'none';
+                renderizarCuadrilla();
             } catch (err) {
-                console.error("Error conectando a JSONBin:", err);
-                document.getElementById('loading').textContent = "Error al conectar con la base de datos remota. Revisa tus claves.";
+                console.error("Error cargando datos:", err);
+                document.getElementById('loading').textContent = "Error al conectar con la base de datos local.";
             }
-        }
-
-        async function inicializarBaseDatos() {
-            let estructuraInicial = {};
-            for (let i = 1; i <= TOTAL_NUMEROS; i++) {
-                estructuraInicial[String(i).padStart(2, '0')] = { vendido: false, nombre: "" };
-            }
-            await guardarEnServidor(estructuraInicial);
-            estadoRifa = estructuraInicial;
-            document.getElementById('loading').style.display = 'none';
-            renderizarCuadrilla();
         }
 
         function renderizarCuadrilla() {
@@ -211,10 +188,9 @@
             });
         }
 
-        async function gestionarSeleccion(numero) {
+        function gestionarSeleccion(numero) {
             const infoActual = estadoRifa[numero];
             const estaVendido = (typeof infoActual === 'object') ? infoActual.vendido : infoActual;
-            let nuevoEstado = { ...estadoRifa };
 
             if (!estaVendido) {
                 const nombreComprador = prompt(`¡Número ${numero} disponible!\nIngresa tu nombre y apellido para apartarlo:`);
@@ -225,48 +201,25 @@
                     return;
                 }
 
-                nuevoEstado[numero] = { vendido: true, nombre: nombreComprador.trim() };
+                estadoRifa[numero] = { vendido: true, nombre: nombreComprador.trim() };
             } else {
                 const nombreRegistrado = (typeof infoActual === 'object' && infoActual.nombre) ? `(Comprado por: ${infoActual.nombre})` : "";
                 const pass = prompt(`El número ${numero} ya está vendido ${nombreRegistrado}.\nIngresa la contraseña de modificación para liberarlo:`);
                 if (pass === null) return;
                 
                 if (pass === CONTRASEÑA_CORRECTA) {
-                    nuevoEstado[numero] = { vendido: false, nombre: "" };
+                    estadoRifa[numero] = { vendido: false, nombre: "" };
                 } else {
                     alert("Contraseña incorrecta. No tienes permisos para liberar este número.");
                     return;
                 }
             }
 
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('loading').textContent = "Guardando cambios en la nube...";
-            
-            const exito = await guardarEnServidor(nuevoEstado);
-            if (exito) {
-                estadoRifa = nuevoEstado;
-                renderizarCuadrilla();
-            } else {
-                alert("Hubo un error de conexión al guardar el número. Inténtalo de nuevo.");
-            }
-            document.getElementById('loading').style.display = 'none';
-        }
-
-        async function guardarEnServidor(datos) {
-            try {
-                const res = await fetch(API_URL, {
-                    method: 'PUT',
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-Master-Key": API_KEY
-                    },
-                    body: JSON.stringify(datos)
-                });
-                return res.ok;
-            } catch (err) {
-                console.error("Error al guardar:", err);
-                return false;
-            }
+            // Como estamos usando GitHub Pages estático, al apartar el número de forma local 
+            // se le indica al usuario el respaldo visual y se le puede guiar a actualizar el archivo,
+            // o bien se mantiene en memoria para la sesión.
+            renderizarCuadrilla();
+            alert(`¡Acción registrada para el número ${numero}!\nNota: Recuerda actualizar el archivo rifa-db.json en tu repositorio si deseas que el cambio sea permanente para todos los visitantes.`);
         }
 
         cargarEstado();
