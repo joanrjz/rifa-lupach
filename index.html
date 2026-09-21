@@ -199,14 +199,14 @@
                     return;
                 }
 
-                alert(`Número ${numero} apartado temporalmente para: ${nombreComprador.trim()}.\n\nPara hacerlo oficial y actualizarlo para todos, recuerda actualizar el archivo 'rifa-db.json' en tu repositorio.`);
+                alert(`Número ${numero} consultado.\n\nPara apartarlo oficialmente, actualiza el archivo 'rifa-db.json' en tu repositorio de GitHub.`);
             } else {
                 const nombreRegistrado = (typeof infoActual === 'object' && infoActual.nombre) ? `(Comprado por: ${infoActual.nombre})` : "";
-                const pass = prompt(`El número ${numero} ya está vendido ${nombreRegistrado}.\nIngresa la contraseña para liberarlo:`);
+                const pass = prompt(`El número ${numero} ya está vendido ${nombreRegistrado}.\nIngresa la contraseña para verificar permisos:`);
                 if (pass === null) return;
                 
                 if (pass === CONTRASEÑA_CORRECTA) {
-                    alert(`Contraseña correcta. Recuerda actualizar el archivo 'rifa-db.json' en tu repositorio para liberar el número ${numero}.`);
+                    alert(`Contraseña correcta. Para liberarlo, actualiza el archivo 'rifa-db.json' en tu repositorio.`);
                 } else {
                     alert("Contraseña incorrecta.");
                     return;
@@ -217,5 +217,3 @@
         cargarEstado();
         setInterval(cargarEstado, 10000);
     </script>
-</body>
-</html>
