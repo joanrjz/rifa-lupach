@@ -125,16 +125,22 @@
     <div class="cuadrante" id="cuadrilla"></div>
 
     <script>
+        // ==========================================
+        //  CONFIGURA TUS DATOS DE GITHUB AQUÍ
+        //  (No se requieren tokens aquí por seguridad)
+        // ==========================================
+        const OWNER = "joanrjz";   // Reemplaza con tu usuario exacto
+        const REPO = "rifa-lupach"; // Reemplaza con el nombre de tu repositorio
+        // ==========================================
+
         const CONTRASEÑA_CORRECTA = "Grecia2026";
         const TOTAL_NUMEROS = 150;
-        // Apunta directamente al archivo JSON dentro de tu repositorio en GitHub Pages
         const DB_URL = "rifa-db.json"; 
         
         let estadoRifa = {};
 
         async function cargarEstado() {
             try {
-                // Añadimos un parámetro de tiempo para evitar que el navegador guarde en caché versiones viejas
                 const res = await fetch(`${DB_URL}?t=${new Date().getTime()}`);
                 if (!res.ok) throw new Error("No se pudo cargar la base de datos");
                 
@@ -143,7 +149,7 @@
                 renderizarCuadrilla();
             } catch (err) {
                 console.error("Error cargando datos:", err);
-                document.getElementById('loading').textContent = "Error al conectar con la base de datos local.";
+                document.getElementById('loading').textContent = "Error al conectar con la base de datos.";
             }
         }
 
@@ -188,9 +194,10 @@
             });
         }
 
-        function gestionarSeleccion(numero) {
+        async function gestionarSeleccion(numero) {
             const infoActual = estadoRifa[numero];
             const estaVendido = (typeof infoActual === 'object') ? infoActual.vendido : infoActual;
+            let nuevoEstado = { ...estadoRifa };
 
             if (!estaVendido) {
                 const nombreComprador = prompt(`¡Número ${numero} disponible!\nIngresa tu nombre y apellido para apartarlo:`);
@@ -201,25 +208,60 @@
                     return;
                 }
 
-                estadoRifa[numero] = { vendido: true, nombre: nombreComprador.trim() };
+                nuevoEstado[numero] = { vendido: true, nombre: nombreComprador.trim() };
             } else {
                 const nombreRegistrado = (typeof infoActual === 'object' && infoActual.nombre) ? `(Comprado por: ${infoActual.nombre})` : "";
                 const pass = prompt(`El número ${numero} ya está vendido ${nombreRegistrado}.\nIngresa la contraseña de modificación para liberarlo:`);
                 if (pass === null) return;
                 
                 if (pass === CONTRASEÑA_CORRECTA) {
-                    estadoRifa[numero] = { vendido: false, nombre: "" };
+                    nuevoEstado[numero] = { vendido: false, nombre: "" };
                 } else {
                     alert("Contraseña incorrecta. No tienes permisos para liberar este número.");
                     return;
                 }
             }
 
-            // Como estamos usando GitHub Pages estático, al apartar el número de forma local 
-            // se le indica al usuario el respaldo visual y se le puede guiar a actualizar el archivo,
-            // o bien se mantiene en memoria para la sesión.
-            renderizarCuadrilla();
-            alert(`¡Acción registrada para el número ${numero}!\nNota: Recuerda actualizar el archivo rifa-db.json en tu repositorio si deseas que el cambio sea permanente para todos los visitantes.`);
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = "Guardando cambios automáticamente...";
+
+            const exito = await dispararGitHubAction(nuevoEstado);
+            if (exito) {
+                estadoRifa = nuevoEstado;
+                renderizarCuadrilla();
+                alert(`¡Éxito! El número ${numero} ha sido actualizado en la nube para todos.`);
+            } else {
+                alert("Hubo un error al actualizar el número. Inténtalo de nuevo.");
+            }
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        async function dispararGitHubAction(datosNuevos) {
+            try {
+                const url = `https://api.github.com/repos/${OWNER}/${REPO}/dispatches`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        "Accept": "application/vnd.github+json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        event_type: "actualizar-rifa",
+                        client_payload: {
+                            nuevoJson: JSON.stringify(datosNuevos, null, 2)
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                    return true;
+                }
+                return false;
+            } catch (err) {
+                console.error("Error disparando Action:", err);
+                return false;
+            }
         }
 
         cargarEstado();
