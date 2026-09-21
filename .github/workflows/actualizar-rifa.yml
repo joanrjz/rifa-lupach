@@ -1,0 +1,22 @@
+name: Actualizar Rifa DB
+
+on:
+  repository_dispatch:
+    types: [actualizar-rifa]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar Repositorio
+        uses: actions/checkout@v4
+
+      - name: Actualizar Archivo JSON
+        run: |
+          echo '${{ github.event.client_payload.nuevoJson }}' > rifa-db.json
+
+      - name: Hacer Commit y Push de los cambios
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Actualización automática de rifa por un usuario"
+          file_pattern: "rifa-db.json"
