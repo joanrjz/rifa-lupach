@@ -112,7 +112,7 @@
         <input type="text" id="buscador" placeholder="🔍 Buscar número (ej. 05, 12)..." onkeyup="filtrarNumeros()">
     </div>
 
-    <p class="subtitle">Selecciona un número para consultar su estado o apartarlo.</p>
+    <p class="subtitle">Los cambios se guardan automáticamente en tiempo real para todos los visitantes.</p>
 
     <div class="leyenda">
         <div class="leyenda-item"><div class="cuadro disp"></div><span>Disponible</span></div>
@@ -121,27 +121,37 @@
 
     <p class="subtitle">By IT. RAST-2026.</p>
    
-    <div id="loading" class="loading">Cargando tablero...</div>
+    <div id="loading" class="loading">Sincronizando tablero en tiempo real...</div>
     <div class="cuadrante" id="cuadrilla"></div>
 
     <script>
+        // ==========================================
+        //  CONFIGURACIÓN DE TU API DE JSON EXTERNA
+        // ==========================================
+        // Reemplaza esto con la URL y cabeceras de tu servicio JSON en la nube (ej. JSONbin)
+        const API_URL = "6aac3643ac6210605ad99cf0";
+        const API_KEY = "AQUÍ_PEGAS_TU_MASTER_KEY_SI_APLICA"; // O déjalo vacío si tu API es abierta
+        // ==========================================
+
         const CONTRASEÑA_CORRECTA = "Grecia2026";
-        const TOTAL_NUMEROS = 150;
-        const DB_URL = "rifa-db.json"; 
-        
         let estadoRifa = {};
 
         async function cargarEstado() {
             try {
-                const res = await fetch(`${DB_URL}?t=${new Date().getTime()}`);
-                if (!res.ok) throw new Error("No se pudo cargar la base de datos");
+                const res = await fetch(`${API_URL}?t=${new Date().getTime()}`, {
+                    headers: API_KEY ? { "X-Master-Key": API_KEY } : {}
+                });
+                if (!res.ok) throw new Error("No se pudo conectar con la base de datos.");
                 
-                estadoRifa = await res.json();
+                const data = await res.json();
+                // Dependiendo del servicio, el JSON puede venir dentro de un campo .record
+                estadoRifa = data.record || data; 
+                
                 document.getElementById('loading').style.display = 'none';
                 renderizarCuadrilla();
             } catch (err) {
                 console.error("Error cargando datos:", err);
-                document.getElementById('loading').textContent = "Error al conectar con la base de datos.";
+                document.getElementById('loading').textContent = "Error al conectar con la base de datos en la nube.";
             }
         }
 
@@ -186,34 +196,69 @@
             });
         }
 
-        function gestionarSeleccion(numero) {
+        async function gestionarSeleccion(numero) {
             const infoActual = estadoRifa[numero];
             const estaVendido = (typeof infoActual === 'object') ? infoActual.vendido : infoActual;
+            let nuevoEstado = { ...estadoRifa };
 
             if (!estaVendido) {
-                const nombreComprador = prompt(`¡El número ${numero} está disponible!\nIngresa el nombre del comprador para registrarlo:`);
+                const nombreComprador = prompt(`¡Número ${numero} disponible!\nIngresa tu nombre y apellido para apartarlo:`);
                 if (nombreComprador === null) return; 
                 
                 if (nombreComprador.trim() === "") {
-                    alert("Debes ingresar un nombre válido.");
+                    alert("Debes ingresar un nombre válido para apartar el número.");
                     return;
                 }
 
-                alert(`Número ${numero} consultado.\n\nPara apartarlo oficialmente, actualiza el archivo 'rifa-db.json' en tu repositorio de GitHub.`);
+                nuevoEstado[numero] = { vendido: true, nombre: nombreComprador.trim() };
             } else {
                 const nombreRegistrado = (typeof infoActual === 'object' && infoActual.nombre) ? `(Comprado por: ${infoActual.nombre})` : "";
-                const pass = prompt(`El número ${numero} ya está vendido ${nombreRegistrado}.\nIngresa la contraseña para verificar permisos:`);
+                const pass = prompt(`El número ${numero} ya está vendido ${nombreRegistrado}.\nIngresa la contraseña de modificación para liberarlo:`);
                 if (pass === null) return;
                 
                 if (pass === CONTRASEÑA_CORRECTA) {
-                    alert(`Contraseña correcta. Para liberarlo, actualiza el archivo 'rifa-db.json' en tu repositorio.`);
+                    nuevoEstado[numero] = { vendido: false, nombre: "" };
                 } else {
-                    alert("Contraseña incorrecta.");
+                    alert("Contraseña incorrecta. No tienes permisos para liberar este número.");
                     return;
                 }
+            }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = "Guardando cambios en la nube...";
+
+            const exito = await guardarEnNube(nuevoEstado);
+            if (exito) {
+                estadoRifa = nuevoEstado;
+                renderizarCuadrilla();
+                alert(`¡Éxito! El número ${numero} ha sido actualizado correctamente para todos.`);
+            } else {
+                alert("Hubo un error al guardar en la nube. Inténtalo de nuevo.");
+            }
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        async function guardarEnNube(datosNuevos) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'PUT', // o 'POST' dependiendo del servicio JSON que uses
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(API_KEY ? { "X-Master-Key": API_KEY } : {})
+                    },
+                    body: JSON.stringify(datosNuevos)
+                });
+
+                return response.ok;
+            } catch (err) {
+                console.error("Error guardando en nube:", err);
+                return false;
             }
         }
 
         cargarEstado();
+        // Sincroniza cada 10 segundos para ver si alguien más compró un número
         setInterval(cargarEstado, 10000);
     </script>
+</body>
+</html>
