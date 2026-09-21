@@ -112,7 +112,7 @@
         <input type="text" id="buscador" placeholder="🔍 Buscar número (ej. 05, 12)..." onkeyup="filtrarNumeros()">
     </div>
 
-    <p class="subtitle">Los cambios se actualizan en tiempo real en Internet. Selecciona tu número para comprarlo.</p>
+    <p class="subtitle">Selecciona un número para consultar su estado o apartarlo.</p>
 
     <div class="leyenda">
         <div class="leyenda-item"><div class="cuadro disp"></div><span>Disponible</span></div>
@@ -121,18 +121,10 @@
 
     <p class="subtitle">By IT. RAST-2026.</p>
    
-    <div id="loading" class="loading">Sincronizando tablero en tiempo real...</div>
+    <div id="loading" class="loading">Cargando tablero...</div>
     <div class="cuadrante" id="cuadrilla"></div>
 
     <script>
-        // ==========================================
-        //  CONFIGURA TUS DATOS DE GITHUB AQUÍ
-        //  (No se requieren tokens aquí por seguridad)
-        // ==========================================
-        const OWNER = "joanrjz";   // Reemplaza con tu usuario exacto
-        const REPO = "rifa-lupach"; // Reemplaza con el nombre de tu repositorio
-        // ==========================================
-
         const CONTRASEÑA_CORRECTA = "Grecia2026";
         const TOTAL_NUMEROS = 150;
         const DB_URL = "rifa-db.json"; 
@@ -194,73 +186,31 @@
             });
         }
 
-        async function gestionarSeleccion(numero) {
+        function gestionarSeleccion(numero) {
             const infoActual = estadoRifa[numero];
             const estaVendido = (typeof infoActual === 'object') ? infoActual.vendido : infoActual;
-            let nuevoEstado = { ...estadoRifa };
 
             if (!estaVendido) {
-                const nombreComprador = prompt(`¡Número ${numero} disponible!\nIngresa tu nombre y apellido para apartarlo:`);
+                const nombreComprador = prompt(`¡El número ${numero} está disponible!\nIngresa el nombre del comprador para registrarlo:`);
                 if (nombreComprador === null) return; 
                 
                 if (nombreComprador.trim() === "") {
-                    alert("Debes ingresar un nombre válido para apartar el número.");
+                    alert("Debes ingresar un nombre válido.");
                     return;
                 }
 
-                nuevoEstado[numero] = { vendido: true, nombre: nombreComprador.trim() };
+                alert(`Número ${numero} apartado temporalmente para: ${nombreComprador.trim()}.\n\nPara hacerlo oficial y actualizarlo para todos, recuerda actualizar el archivo 'rifa-db.json' en tu repositorio.`);
             } else {
                 const nombreRegistrado = (typeof infoActual === 'object' && infoActual.nombre) ? `(Comprado por: ${infoActual.nombre})` : "";
-                const pass = prompt(`El número ${numero} ya está vendido ${nombreRegistrado}.\nIngresa la contraseña de modificación para liberarlo:`);
+                const pass = prompt(`El número ${numero} ya está vendido ${nombreRegistrado}.\nIngresa la contraseña para liberarlo:`);
                 if (pass === null) return;
                 
                 if (pass === CONTRASEÑA_CORRECTA) {
-                    nuevoEstado[numero] = { vendido: false, nombre: "" };
+                    alert(`Contraseña correcta. Recuerda actualizar el archivo 'rifa-db.json' en tu repositorio para liberar el número ${numero}.`);
                 } else {
-                    alert("Contraseña incorrecta. No tienes permisos para liberar este número.");
+                    alert("Contraseña incorrecta.");
                     return;
                 }
-            }
-
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('loading').textContent = "Guardando cambios automáticamente...";
-
-            const exito = await dispararGitHubAction(nuevoEstado);
-            if (exito) {
-                estadoRifa = nuevoEstado;
-                renderizarCuadrilla();
-                alert(`¡Éxito! El número ${numero} ha sido actualizado en la nube para todos.`);
-            } else {
-                alert("Hubo un error al actualizar el número. Inténtalo de nuevo.");
-            }
-            document.getElementById('loading').style.display = 'none';
-        }
-
-        async function dispararGitHubAction(datosNuevos) {
-            try {
-                const url = `https://api.github.com/repos/${OWNER}/${REPO}/dispatches`;
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        "Accept": "application/vnd.github+json",
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        event_type: "actualizar-rifa",
-                        client_payload: {
-                            nuevoJson: JSON.stringify(datosNuevos, null, 2)
-                        }
-                    })
-                });
-
-                if (response.ok) {
-                    await new Promise(resolve => setTimeout(resolve, 4000));
-                    return true;
-                }
-                return false;
-            } catch (err) {
-                console.error("Error disparando Action:", err);
-                return false;
             }
         }
 
